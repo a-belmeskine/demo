@@ -7,7 +7,6 @@ import dev.turingcomplete.kotlinonetimepassword.GoogleAuthenticator
 import org.slf4j.LoggerFactory
 import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.http.MediaType
 import org.springframework.http.converter.BufferedImageHttpMessageConverter
@@ -17,13 +16,16 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
-import java.awt.PageAttributes
+import org.springframework.web.bind.annotation.RestController
 import java.awt.image.BufferedImage
 import java.util.*
+import java.util.stream.Collectors
 
 @EnableScheduling
 @SpringBootApplication
 class SpringTotpApplication {
+
+
     companion object {
         private val log = LoggerFactory.getLogger(SpringTotpApplication::class.java)
 
@@ -33,7 +35,10 @@ class SpringTotpApplication {
         }
     }
 
-    private val secret = GoogleAuthenticator.createRandomSecret();
+    // var secret = GoogleAuthenticator.createRandomSecret();
+    // secret key to be saved in BDD, the user have the save secret key in his mobile within Google Authenticator application
+     var secret = "MLTTZFRF3VIAPI4I";
+    lateinit var code: String
 
     init {
         log.info(secret);
@@ -42,7 +47,7 @@ class SpringTotpApplication {
     @Scheduled(fixedRate = 1000L)
     fun ping() {
         val timestamp = Date(System.currentTimeMillis())
-        val code = GoogleAuthenticator(secret).generate(timestamp)
+        code = GoogleAuthenticator(secret).generate(timestamp)
         log.info(code)
     }
 
@@ -55,10 +60,24 @@ class SpringTotpApplication {
     }
 
 
+    /*   fun isValid(code: String, timestamp: Date = Date(System.currentTimeMillis())): Boolean {
+           return code == this.code;
+       }
+   */
+
+    @RestController
     class BarcodeController(private val generator: CodeGenerator) {
         @GetMapping("/barCode/{secret}", produces = [MediaType.IMAGE_PNG_VALUE])
         fun barCode(@PathVariable secret: String): BufferedImage {
             return generator.generate("Labeler", "abdelkader.cyclope@gmail.com", secret)
+        }
+        @GetMapping("/isvalid/{secret}/{code}")
+        fun isValid(@PathVariable code: String, @PathVariable secret: String): Boolean {
+            val time: Long=  System.currentTimeMillis();
+            val codes =   listOf(Date(time-60000), Date(time-30000), Date(time),Date(time+30000), Date(time+60000) ).stream().map { time-> GoogleAuthenticator(secret).generate(time) }.collect(Collectors.toList())
+            codes.forEach { println(it ) }
+            log.info("code :$code codesNow: $codes")
+            return codes.contains(code);
         }
 
     }
